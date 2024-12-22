@@ -10,29 +10,30 @@ main =>
     main(["sample.in"]).
     
 main([File]) =>
-    read_data(File,N,Board,Grid),
+    read_data(File,NR,NC,Board,Grid),
     hcp_grid(Grid,Es),   % new built-in in Picat version 3.1
     EMap = new_map(),
     foreach ({(R1,C1),(R2,C2),B} in Es)
         EMap.put({R1,C1,R2,C2}, B)
     end,
-    foreach(R in 1..N, C in 1..N)
+    foreach(R in 1..NR, C in 1..NC)
         if Board[R,C] = $w(Clue) then
-            constrain_w(N,EMap,R,C,Clue)
+            constrain_w(NR,NC,EMap,R,C,Clue)
         elseif Board[R,C] = $b(Clue) then
-            constrain_b(N,EMap,R,C,Clue)
+            constrain_b(NR,NC,EMap,R,C,Clue)
         end
     end,
     solve((Grid,values(EMap))),
     output(EMap).
 
-read_data(File,N,Board,Grid) =>
+read_data(File,NR,NC,Board,Grid) =>
     IS = open(File),
     Line1 = read_line(IS),
-    [N0,NW,NB] = [to_int(Token) : Token in split(Line1)],
-    N is N0+1,
-    Board = new_array(N,N),
-    Grid = new_array(N,N),
+    [NR0,NC0,NW,NB] = [to_int(Token) : Token in split(Line1)],
+    NR is NR0+1,
+    NC is NC0+1,
+    Board = new_array(NR,NC),
+    Grid = new_array(NR,NC),
     foreach (I in 1..NW)
         Line = read_line(IS),
         [R0,C0,Clue] = [to_int(Token) : Token in split(Line)],
@@ -45,15 +46,15 @@ read_data(File,N,Board,Grid) =>
         Board[R0+1,C0+1] = $b(Clue),
         Grid[R0+1,C0+1] = 1        
     end,
-    foreach (R in 1..N, C in 1..N)
+    foreach (R in 1..NR, C in 1..NC)
         (var(Board[R,C]) -> Board[R,C] = empty; true)
     end,
-    Grid :: 0..1,          % the cell (R,C) is in the circuit iff Grid[R,C] = 1
+    Grid :: 0..1,          % the cell (R,C) is in the circuit if Grid[R,C] = 1
     close(IS).
 
 % White circles must be passed through in a straight line.
 % The clue numbers in the circles show the sum of the lengths of the 2 straight lines going out of that circle. 
-constrain_w(N,EMap,R,C,Clue) =>
+constrain_w(NR,NC,EMap,R,C,Clue) =>
     Ps = [],
     foreach (D1 in 1..Clue-1, D2 = Clue-D1)
         V = [(R1,C) : R1 in R-D1..R+D2],
@@ -68,11 +69,11 @@ constrain_w(N,EMap,R,C,Clue) =>
         P8 = [(R+1,C-D1)] ++ H ++ [(R+1,C+D2)],
         Ps := [P1,P2,P3,P4,P5,P6,P7,P8|Ps]
     end,
-    constrain_paths(N,EMap,Ps,[]).
+    constrain_paths(NR,NC,EMap,Ps,[]).
 
 % Black circles must be turned upon.
 % The clue numbers in the circles show the sum of the lengths of the 2 straight lines going out of that circle. 
-constrain_b(N,EMap,R,C,Clue) =>
+constrain_b(NR,NC,EMap,R,C,Clue) =>
     Ps = [],
     foreach (D1 in 1..Clue-1, D2 = Clue-D1)
         L1 = [(R1,C) : R1 in R-D1..R] ++ [(R,C1) : C1 in C-1..-1..C-D2],
@@ -97,17 +98,17 @@ constrain_b(N,EMap,R,C,Clue) =>
         P16  = [(R+1,C-D1)] ++ L4 ++ [(R+D2,C+1)],
         Ps := [P1,P2,P3,P4,P5,P6,P7,P8,P9,P10,P11,P12,P13,P14,P15,P16|Ps]
     end,
-    constrain_paths(N,EMap,Ps,[]).
+    constrain_paths(NR,NC,EMap,Ps,[]).
 
-constrain_paths(_N,_EMap,[],Bs) =>
+constrain_paths(_NR,_NC,_EMap,[],Bs) =>
     sum(Bs) #>= 1.
-constrain_paths(N,EMap,[P|Ps],Bs), all_coords_on_board(N,P) =>
+constrain_paths(NR,NC,EMap,[P|Ps],Bs), all_coords_on_board(NR,NC,P) =>
     constrain_path(EMap,P,[],B1),
     RevP = reverse(P),
     constrain_path(EMap,RevP,[],B2),
-    constrain_paths(N,EMap,Ps,[B1,B2|Bs]).
-constrain_paths(N,EMap,[_|Ps],Bs) =>
-    constrain_paths(N,EMap,Ps,Bs).
+    constrain_paths(NR,NC,EMap,Ps,[B1,B2|Bs]).
+constrain_paths(NR,NC,EMap,[_|Ps],Bs) =>
+    constrain_paths(NR,NC,EMap,Ps,Bs).
 
 constrain_path(EMap,[(R,C),(R1,C1)|P],ConjBs,B) =>
     EdgeIn = EMap.get({R,C,R1,C1}),
@@ -116,10 +117,10 @@ constrain_path(EMap,[(R,C),(R1,C1)|P],ConjBs,B) =>
 constrain_path(_EMap,_,ConjBs,B) =>
     B #= min(ConjBs).
 
-all_coords_on_board(N,P) =>
+all_coords_on_board(NR,NC,P) =>
     foreach ((R,C) in P)
-        R >= 1, R =< N,
-        C >= 1, C =< N
+        R >= 1, R =< NR,
+        C >= 1, C =< NC
     end.
 
 output(EMap) =>
